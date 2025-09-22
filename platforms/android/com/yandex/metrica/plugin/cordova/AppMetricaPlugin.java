@@ -1,6 +1,5 @@
 /*
  * Version for Cordova/PhoneGap
- * © 2017-2019 YANDEX
  * You may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * https://yandex.com/legal/appmetrica_sdk_agreement/
@@ -39,6 +38,7 @@ import io.appmetrica.analytics.ecommerce.ECommercePrice;
 import io.appmetrica.analytics.ecommerce.ECommerceProduct;
 import io.appmetrica.analytics.ecommerce.ECommerceReferrer;
 import io.appmetrica.analytics.ecommerce.ECommerceScreen;
+import timber.log.Timber;
 
 
 public class AppMetricaPlugin extends CordovaPlugin {
@@ -49,38 +49,26 @@ public class AppMetricaPlugin extends CordovaPlugin {
     private boolean mAppMetricaActivated = false;
 
     @Override
-    public boolean execute(final String action, final JSONArray args,
-                           final CallbackContext callbackContext) throws JSONException {
-        getAppMetricaExecutor().execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    if ("activate".equals(action)) {
-                        activate(args, callbackContext);
-                    } else if ("reportEvent".equals(action)) {
-                        reportEvent(args, callbackContext);
-                    } else if ("reportError".equals(action)) {
-                        reportError(args, callbackContext);
-                    } else if ("setLocation".equals(action)) {
-                        setLocation(args, callbackContext);
-                    } else if ("setLocationTracking".equals(action)) {
-                        setLocationTracking(args, callbackContext);
-                    } else if ("showScreen".equals(action)) {
-                        showScreen(args, callbackContext);
-                    } else if ("showProductCard".equals(action)) {
-                        showProductCard(args, callbackContext);
-                    } else if ("addToCart".equals(action)) {
-                        addToCart(args, callbackContext);
-                    } else if ("removeFromCart".equals(action)) {
-                        removeFromCart(args, callbackContext);
-                    } else if ("finishCheckout".equals(action)) {
-                        finishCheckout(args, callbackContext);
-                    } else {
-                        callbackContext.error("Unknown action: " + action);
-                    }
-                } catch (JSONException ex) {
-                    callbackContext.error(ex.getMessage());
+    public boolean execute(final String action, final JSONArray args, final CallbackContext cb) {
+        getAppMetricaExecutor().execute(() -> {
+            try {
+                switch (action) {
+                    case "activate":          activate(args, cb); break;
+                    case "reportEvent":       reportEvent(args, cb); break;
+                    case "reportError":       reportError(args, cb); break;
+                    case "setLocation":       setLocation(args, cb); break;
+                    case "setLocationTracking": setLocationTracking(args, cb); break;
+                    case "showScreen":        safeShowScreen(args, cb); break;
+                    case "showProductCard":   safeShowProductCard(args, cb); break;
+                    case "addToCart":         safeAddToCart(args, cb); break;
+                    case "removeFromCart":    safeRemoveFromCart(args, cb); break;
+                    case "finishCheckout":    safeFinishCheckout(args, cb); break;
+                    case "beginCheckout":     safeBeginCheckout(args, cb); break;
+                    default: cb.error("Unknown action: " + action);
                 }
+            } catch (Throwable t) {
+                Timber.tag("AppMetricaPlugin").e(t, "Unhandled error");
+                safeError(cb, "internal_error", t.getMessage());
             }
         });
         return true;
@@ -129,72 +117,11 @@ public class AppMetricaPlugin extends CordovaPlugin {
             ECommerceReferrer referrer = new ECommerceReferrer().setScreen(screen);
             return new ECommerceCartItem(product, actualPrice, Double.parseDouble(object.getString("quantity"))).setReferrer(referrer);
         } catch (Throwable t) {
-            Log.e("ERROR", t.toString());
+            Timber.tag("ERROR").e(t.toString());
             return null;
         }
     }
 
-    public void showScreen(final JSONArray params, final CallbackContext callbackContext) throws JSONException {
-        ECommerceScreen screen = this.createScreen(params);
-        ECommerceEvent showScreenEvent = ECommerceEvent.showScreenEvent(screen);
-        AppMetrica.reportECommerce(showScreenEvent);
-    }
-
-    public void showProductCard(final JSONArray params, final CallbackContext callbackContext) throws JSONException {
-        ECommerceScreen screen = this.createScreen(params);
-        ECommerceProduct product = this.createProduct(params);
-        ECommerceEvent showProductCardEvent = ECommerceEvent.showProductCardEvent(product, screen);
-        AppMetrica.reportECommerce(showProductCardEvent);
-    }
-
-    public void addToCart(final JSONArray params, final CallbackContext callbackContext) throws JSONException {
-        ECommerceCartItem cartItem = this.createCartItem(params);
-        ECommerceEvent addCartItemEvent = ECommerceEvent.addCartItemEvent(cartItem);
-        AppMetrica.reportECommerce(addCartItemEvent);
-    }
-
-    public void removeFromCart(final JSONArray params, final CallbackContext callbackContext) throws JSONException {
-        ECommerceCartItem cartItem = this.createCartItem(params);
-        ECommerceEvent removeCartItemEvent = ECommerceEvent.removeCartItemEvent(cartItem);
-        AppMetrica.reportECommerce(removeCartItemEvent);
-    }
-
-    public void beginCheckout(final JSONArray products, final CallbackContext callbackContext) throws JSONException {
-        String identifier = products.getJSONObject(0).getString("identifier");
-        JSONArray jsonArray = products.getJSONObject(0).getJSONArray("products");
-        ArrayList<ECommerceCartItem> cartItems = new ArrayList<>();
-        try {
-            for (int i = 0; i < jsonArray.length(); i++) {
-                JSONArray jsonArr = new JSONArray();
-                cartItems.add(this.createCartItem(jsonArr.put(jsonArray.getJSONObject(i))));
-            }
-            ECommerceOrder order = new ECommerceOrder(identifier, cartItems);
-            ECommerceEvent beginCheckoutEvent = ECommerceEvent.beginCheckoutEvent(order);
-            AppMetrica.reportECommerce(beginCheckoutEvent);
-            callbackContext.success("add products beginCheckout");
-        } catch (JSONException ex) {
-            callbackContext.error(ex.getMessage());
-        }
-    }
-
-    public void finishCheckout(final JSONArray products, final CallbackContext callbackContext) throws JSONException {
-        String identifier = products.getJSONObject(0).getString("identifier");
-        JSONArray jsonArray = products.getJSONObject(0).getJSONArray("products");
-        ArrayList<ECommerceCartItem> cartItems = new ArrayList<>();
-        try {
-            for (int i = 0; i < jsonArray.length(); i++) {
-                JSONArray jsonArr = new JSONArray();
-                cartItems.add(this.createCartItem(jsonArr.put(jsonArray.getJSONObject(i))));
-            }
-            ECommerceOrder order = new ECommerceOrder(identifier, cartItems);
-            ECommerceEvent purchaseEvent = ECommerceEvent.purchaseEvent(order);
-            AppMetrica.reportECommerce(purchaseEvent);
-            callbackContext.success("add products finishCheckout");
-        } catch (JSONException ex) {
-            callbackContext.error(ex.getMessage());
-        }
-
-    }
 
     private Activity getActivity() {
         return cordova.getActivity();
@@ -312,6 +239,32 @@ public class AppMetricaPlugin extends CordovaPlugin {
         }
     }
 
+    private ECommerceOrder buildOrder(final JSONArray products) {
+        try {
+            JSONObject root = products.getJSONObject(0);
+            String identifier = root.optString("identifier", "");
+            if (identifier.isEmpty()) return null;
+
+            JSONArray items = root.optJSONArray("products");
+            if (items == null || items.length() == 0) return null;
+
+            ArrayList<ECommerceCartItem> cartItems = new ArrayList<>();
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject one = items.optJSONObject(i);
+                if (one == null) continue;
+                JSONArray wrap = new JSONArray().put(one);
+                ECommerceCartItem ci = createCartItem(wrap);
+                if (ci != null) cartItems.add(ci);
+            }
+            if (cartItems.isEmpty()) return null;
+
+            return new ECommerceOrder(identifier, cartItems);
+        } catch (Throwable t) {
+            Timber.tag("AppMetricaPlugin").e(t, "buildOrder");
+            return null;
+        }
+    }
+
     private void reportEvent(final JSONArray args,
                              final CallbackContext callbackContext) throws JSONException {
         final String eventName = args.getString(0);
@@ -326,6 +279,89 @@ public class AppMetricaPlugin extends CordovaPlugin {
             AppMetrica.reportEvent(eventName, eventParametersJSONString);
         } else {
             AppMetrica.reportEvent(eventName);
+        }
+    }
+
+    private void safeShowScreen(final JSONArray params, final CallbackContext cb) {
+        try {
+            ECommerceScreen screen = createScreen(params);
+            AppMetrica.reportECommerce(ECommerceEvent.showScreenEvent(screen));
+            safeOk(cb);
+        } catch (Throwable t) {
+            Timber.tag("AppMetricaPlugin").e(t, "showScreen");
+            safeError(cb, "show_screen_failed", t.getMessage());
+        }
+    }
+
+    private void safeShowProductCard(final JSONArray params, final CallbackContext cb) {
+        try {
+            ECommerceScreen screen = createScreen(params);
+            ECommerceProduct product = createProduct(params);
+            AppMetrica.reportECommerce(ECommerceEvent.showProductCardEvent(product, screen));
+            safeOk(cb);
+        } catch (Throwable t) {
+            Timber.tag("AppMetricaPlugin").e(t, "showProductCard");
+            safeError(cb, "show_product_failed", t.getMessage());
+        }
+    }
+
+    private void safeAddToCart(final JSONArray params, final CallbackContext cb) {
+        try {
+            ECommerceCartItem item = createCartItem(params);
+            if (item == null) {
+                safeError(cb, "validation_error", "Invalid cart item");
+                return;
+            }
+            AppMetrica.reportECommerce(ECommerceEvent.addCartItemEvent(item));
+            safeOk(cb);
+        } catch (Throwable t) {
+            Timber.tag("AppMetricaPlugin").e(t, "addToCart");
+            safeError(cb, "add_to_cart_failed", t.getMessage());
+        }
+    }
+
+    private void safeRemoveFromCart(final JSONArray params, final CallbackContext cb) {
+        try {
+            ECommerceCartItem item = createCartItem(params);
+            if (item == null) {
+                safeError(cb, "validation_error", "Invalid cart item");
+                return;
+            }
+            AppMetrica.reportECommerce(ECommerceEvent.removeCartItemEvent(item));
+            safeOk(cb);
+        } catch (Throwable t) {
+            Timber.tag("AppMetricaPlugin").e(t, "removeFromCart");
+            safeError(cb, "remove_from_cart_failed", t.getMessage());
+        }
+    }
+
+    private void safeBeginCheckout(final JSONArray args, final CallbackContext cb) {
+        try {
+            ECommerceOrder order = buildOrder(args);
+            if (order == null) {
+                safeError(cb, "validation_error", "Invalid order");
+                return;
+            }
+            AppMetrica.reportECommerce(ECommerceEvent.beginCheckoutEvent(order));
+            safeOk(cb, "beginCheckout reported");
+        } catch (Throwable t) {
+            Timber.tag("AppMetricaPlugin").e(t, "beginCheckout");
+            safeError(cb, "begin_checkout_failed", t.getMessage());
+        }
+    }
+
+    private void safeFinishCheckout(final JSONArray args, final CallbackContext cb) {
+        try {
+            ECommerceOrder order = buildOrder(args);
+            if (order == null) {
+                safeError(cb, "validation_error", "Invalid order");
+                return;
+            }
+            AppMetrica.reportECommerce(ECommerceEvent.purchaseEvent(order));
+            safeOk(cb, "finishCheckout reported");
+        } catch (Throwable t) {
+            Timber.tag("AppMetricaPlugin").e(t, "finishCheckout");
+            safeError(cb, "finish_checkout_failed", t.getMessage());
         }
     }
 
@@ -355,5 +391,24 @@ public class AppMetricaPlugin extends CordovaPlugin {
         final boolean enabled = args.getBoolean(0);
 
         AppMetrica.setLocationTracking(enabled);
+    }
+
+    private void safeOk(CallbackContext cb) {
+        if (cb == null) return;
+        try { cb.success(new JSONObject().put("ok", true)); } catch (Exception ignored) {}
+    }
+
+    private void safeOk(CallbackContext cb, String msg) {
+        if (cb == null) return;
+        try {
+            cb.success(new JSONObject().put("ok", true).put("message", msg));
+        } catch (Exception ignored) {}
+    }
+
+    private void safeError(CallbackContext cb, String code, String message) {
+        if (cb == null) return;
+        try {
+            cb.error(new JSONObject().put("ok", false).put("code", code).put("message", String.valueOf(message)));
+        } catch (Exception ignored) {}
     }
 }
