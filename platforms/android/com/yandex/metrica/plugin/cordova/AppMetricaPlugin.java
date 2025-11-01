@@ -38,7 +38,6 @@ import io.appmetrica.analytics.ecommerce.ECommercePrice;
 import io.appmetrica.analytics.ecommerce.ECommerceProduct;
 import io.appmetrica.analytics.ecommerce.ECommerceReferrer;
 import io.appmetrica.analytics.ecommerce.ECommerceScreen;
-import timber.log.Timber;
 
 
 public class AppMetricaPlugin extends CordovaPlugin {
@@ -67,7 +66,7 @@ public class AppMetricaPlugin extends CordovaPlugin {
                     default: cb.error("Unknown action: " + action);
                 }
             } catch (Throwable t) {
-                Timber.tag("AppMetricaPlugin").e(t, "Unhandled error");
+                Log.e("AppMetricaPlugin", "Unhandled error", t);
                 safeError(cb, "internal_error", t.getMessage());
             }
         });
@@ -117,7 +116,7 @@ public class AppMetricaPlugin extends CordovaPlugin {
             ECommerceReferrer referrer = new ECommerceReferrer().setScreen(screen);
             return new ECommerceCartItem(product, actualPrice, Double.parseDouble(object.getString("quantity"))).setReferrer(referrer);
         } catch (Throwable t) {
-            Timber.tag("ERROR").e(t.toString());
+            Log.e("ERROR", t.toString(), t);
             return null;
         }
     }
@@ -260,7 +259,7 @@ public class AppMetricaPlugin extends CordovaPlugin {
 
             return new ECommerceOrder(identifier, cartItems);
         } catch (Throwable t) {
-            Timber.tag("AppMetricaPlugin").e(t, "buildOrder");
+            Log.e("AppMetricaPlugin", "buildOrder", t);
             return null;
         }
     }
@@ -288,7 +287,7 @@ public class AppMetricaPlugin extends CordovaPlugin {
             AppMetrica.reportECommerce(ECommerceEvent.showScreenEvent(screen));
             safeOk(cb);
         } catch (Throwable t) {
-            Timber.tag("AppMetricaPlugin").e(t, "showScreen");
+            Log.e("AppMetricaPlugin", "showScreen", t);
             safeError(cb, "show_screen_failed", t.getMessage());
         }
     }
@@ -300,7 +299,7 @@ public class AppMetricaPlugin extends CordovaPlugin {
             AppMetrica.reportECommerce(ECommerceEvent.showProductCardEvent(product, screen));
             safeOk(cb);
         } catch (Throwable t) {
-            Timber.tag("AppMetricaPlugin").e(t, "showProductCard");
+            Log.e("AppMetricaPlugin", "showProductCard", t);
             safeError(cb, "show_product_failed", t.getMessage());
         }
     }
@@ -315,7 +314,7 @@ public class AppMetricaPlugin extends CordovaPlugin {
             AppMetrica.reportECommerce(ECommerceEvent.addCartItemEvent(item));
             safeOk(cb);
         } catch (Throwable t) {
-            Timber.tag("AppMetricaPlugin").e(t, "addToCart");
+            Log.e("AppMetricaPlugin", "addToCart", t);
             safeError(cb, "add_to_cart_failed", t.getMessage());
         }
     }
@@ -330,7 +329,7 @@ public class AppMetricaPlugin extends CordovaPlugin {
             AppMetrica.reportECommerce(ECommerceEvent.removeCartItemEvent(item));
             safeOk(cb);
         } catch (Throwable t) {
-            Timber.tag("AppMetricaPlugin").e(t, "removeFromCart");
+            Log.e("AppMetricaPlugin", "removeFromCart", t);
             safeError(cb, "remove_from_cart_failed", t.getMessage());
         }
     }
@@ -345,7 +344,7 @@ public class AppMetricaPlugin extends CordovaPlugin {
             AppMetrica.reportECommerce(ECommerceEvent.beginCheckoutEvent(order));
             safeOk(cb, "beginCheckout reported");
         } catch (Throwable t) {
-            Timber.tag("AppMetricaPlugin").e(t, "beginCheckout");
+            Log.e("AppMetricaPlugin", "beginCheckout", t);
             safeError(cb, "begin_checkout_failed", t.getMessage());
         }
     }
@@ -360,7 +359,7 @@ public class AppMetricaPlugin extends CordovaPlugin {
             AppMetrica.reportECommerce(ECommerceEvent.purchaseEvent(order));
             safeOk(cb, "finishCheckout reported");
         } catch (Throwable t) {
-            Timber.tag("AppMetricaPlugin").e(t, "finishCheckout");
+            Log.e("AppMetricaPlugin", "finishCheckout", t);
             safeError(cb, "finish_checkout_failed", t.getMessage());
         }
     }
